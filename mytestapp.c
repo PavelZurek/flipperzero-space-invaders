@@ -23,10 +23,14 @@ typedef struct {
 
 typedef struct {
     // Player coordinates
-    int x;
+    int playerX;
+    // Direction of player movement
+    int playerDirection;
 
-    // Direction of movement
-    int xDirection;
+    // Projectile
+    bool shoot;
+    int projectileX;
+    int projectileY;
 
     // Time of run (ms)
     int time;
@@ -38,7 +42,7 @@ typedef struct {
     ViewPort* view_port; // Input and draw callbacks
     Gui* gui; // Fullscreen view
 
-    Icon* player; // Player ship
+    Icon* playerIcon; // Player ship
 
     TestAppState state; // Application data
 } TestApp;
@@ -47,8 +51,16 @@ static void my_draw_callback(Canvas* canvas, void* context) {
     furi_assert(context);
     TestApp* app = (TestApp*)context;
 
-    canvas_set_font(canvas, FontPrimary);
-    canvas_draw_bitmap(canvas, app->state.x, 56, 13, 8, icon_get_data(app->player));
+    canvas_draw_bitmap(canvas, app->state.playerX, 56, 13, 8, icon_get_data(app->playerIcon));
+
+    if(app->state.shoot) {
+        canvas_draw_line(
+            canvas,
+            app->state.projectileX,
+            app->state.projectileY < 0 ? 0 : app->state.projectileY,
+            app->state.projectileX,
+            app->state.projectileY + 3);
+    }
 }
 
 static void my_input_callback(InputEvent* input_event, void* context) {
@@ -60,13 +72,19 @@ static void my_input_callback(InputEvent* input_event, void* context) {
             MyEvent event;
             event.type = MyEventTypeDone;
             furi_message_queue_put(app->queue, &event, FuriWaitForever);
+        } else if(input_event->key == InputKeyOk && !app->state.shoot) {
+            app->state.projectileX = app->state.playerX + 6;
+            app->state.projectileY = DISPLAY_HEIGHT - 8;
+            app->state.shoot = true;
         }
     } else if(input_event->type == InputTypePress) {
-        if(input_event->key == InputKeyLeft) app->state.xDirection = -1;
-        if(input_event->key == InputKeyRight) app->state.xDirection = 1;
+        if(input_event->key == InputKeyLeft)
+            app->state.playerDirection = -1;
+        else if(input_event->key == InputKeyRight)
+            app->state.playerDirection = 1;
     } else if(input_event->type == InputTypeRelease) {
         if(input_event->key == InputKeyLeft || input_event->key == InputKeyRight) {
-            app->state.xDirection = 0;
+            app->state.playerDirection = 0;
         }
     }
 }
@@ -75,10 +93,18 @@ static void timer_callback(void* context) {
     furi_assert(context);
     TestApp* app = (TestApp*)context;
 
-    app->state.x = app->state.x + app->state.xDirection;
+    // Player movement
+    app->state.playerX = app->state.playerX + app->state.playerDirection;
+    if(app->state.playerX > DISPLAY_WIDTH - 13) app->state.playerX = DISPLAY_WIDTH;
+    if(app->state.playerX < 0) app->state.playerX = 0;
 
-    if(app->state.x > DISPLAY_WIDTH) app->state.x = DISPLAY_WIDTH;
-    if(app->state.x < 0) app->state.x = 0;
+    // Projectile movement
+    if(app->state.shoot) {
+        app->state.projectileY--;
+        if(app->state.projectileY < -3) {
+            app->state.shoot = false;
+        }
+    }
 
     app->state.time += 1;
 }
@@ -112,10 +138,13 @@ int32_t mytestapp_app(void* p) {
     //      Setup
     // ---------------
 
-    app->player = (Icon*)&I_player;
-    app->state.x = (DISPLAY_WIDTH - icon_get_width(app->player)) / 2;
-    app->state.xDirection = 0;
+    app->playerIcon = (Icon*)&I_player;
+    app->state.playerX = (DISPLAY_WIDTH - icon_get_width(app->playerIcon)) / 2;
+    app->state.playerDirection = 0;
     app->state.time = 0;
+    app->state.shoot = false;
+    //app->state.projectileX = -1;
+    //app->state.projectileY = -1;
 
     // ---------------
     //    Main loop
