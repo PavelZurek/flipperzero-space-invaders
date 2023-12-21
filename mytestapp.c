@@ -33,10 +33,10 @@ typedef struct {
     short int projectileY;
 
     // Enemies
-    bool enemyAlive[8];
+    int enemyX[8];
+    int enemyY;
     short int enemyDirection;
-    short int enemyX;
-    short int enemyY;
+    short int enemyCount;
 
     // Time of run (ms)
     int time;
@@ -54,22 +54,29 @@ typedef struct {
     TestAppState state; // Application data
 } TestApp;
 
+void init_game_state(TestApp* app) {
+    app->state.playerX = (DISPLAY_WIDTH - icon_get_width(app->playerIcon)) / 2;
+    app->state.playerDirection = 0;
+    app->state.time = 0;
+    app->state.shoot = false;
+    app->state.enemyDirection = 1;
+
+    for(short int i = 0; i < 8; i++) {
+        app->state.enemyX[i] = i * 12;
+    }
+    app->state.enemyY = 0;
+    app->state.enemyCount = 8;
+}
+
 static void my_draw_callback(Canvas* canvas, void* context) {
     furi_assert(context);
     TestApp* app = (TestApp*)context;
 
     canvas_draw_bitmap(canvas, app->state.playerX, 56, 13, 8, icon_get_data(app->playerIcon));
 
-    for(short int i = 0; i < 8; i++) {
-        if(app->state.enemyAlive[i]) {
-            canvas_draw_bitmap(
-                canvas,
-                app->state.enemyX + i * 12,
-                app->state.enemyY,
-                8,
-                8,
-                icon_get_data(app->enemyIcon));
-        }
+    for(short int i = 0; i < app->state.enemyCount; i++) {
+        canvas_draw_bitmap(
+            canvas, app->state.enemyX[i], app->state.enemyY, 8, 8, icon_get_data(app->enemyIcon));
     }
 
     if(app->state.shoot) {
@@ -127,23 +134,40 @@ static void timer_callback(void* context) {
 
     // Enemy movement
     if(app->state.time % 2) {
-        if(app->state.enemyDirection == 1) {
-            short int maxEnemyRight = 0;
-            for(short int i = 7; i >= 0; i--) {
-                if(app->state.enemyAlive[i]) {
-                    maxEnemyRight = app->state.enemyX - 4 + (i + 1) * 12;
+        if(app->state.enemyDirection == 1 &&
+           app->state.enemyX[app->state.enemyCount - 1] + 8 >= DISPLAY_WIDTH) {
+            app->state.enemyDirection = -1;
+            app->state.enemyY++;
+        } else if(app->state.enemyDirection == -1 && app->state.enemyX[0] <= 0) {
+            app->state.enemyDirection = 1;
+            app->state.enemyY++;
+        } else {
+            for(short int i = 0; i < app->state.enemyCount; i++) {
+                app->state.enemyX[i] += app->state.enemyDirection;
+            }
+        }
+    }
+
+    if(app->state.shoot) {
+        if(app->state.projectileY < app->state.enemyY + 8 &&
+           app->state.projectileY > app->state.enemyY) {
+            for(short int j = 0; j < app->state.enemyCount; j++) {
+                if(app->state.projectileX > app->state.enemyX[j] &&
+                   app->state.projectileX < app->state.enemyX[j] + 8) {
+                    if(app->state.enemyCount == 1) {
+                        // Win
+                        init_game_state(app);
+                        return;
+                    }
+                    for(short int k = j; k <= app->state.enemyCount - 1; k++) {
+                        app->state.enemyX[k] = app->state.enemyX[k + 1];
+                    }
+                    app->state.enemyCount--;
+                    app->state.shoot = false;
                     break;
                 }
             }
-            if(maxEnemyRight >= DISPLAY_WIDTH) {
-                app->state.enemyY += 2;
-                app->state.enemyDirection = -1;
-            }
-        } else if(app->state.enemyX <= 0) {
-            app->state.enemyY += 2;
-            app->state.enemyDirection = 1;
         }
-        app->state.enemyX = app->state.enemyX + app->state.enemyDirection;
     }
 
     app->state.time += 1;
@@ -181,17 +205,7 @@ int32_t mytestapp_app(void* p) {
     app->playerIcon = (Icon*)&I_player;
     app->enemyIcon = (Icon*)&I_enemy;
 
-    app->state.playerX = (DISPLAY_WIDTH - icon_get_width(app->playerIcon)) / 2;
-    app->state.playerDirection = 0;
-    app->state.time = 0;
-    app->state.shoot = false;
-
-    for(short int i = 0; i < 8; i++) {
-        app->state.enemyAlive[i] = true;
-    }
-    app->state.enemyDirection = 1;
-    app->state.enemyX = 1;
-    app->state.enemyY = 1;
+    init_game_state(app);
 
     // ---------------
     //    Main loop
