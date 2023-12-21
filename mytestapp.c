@@ -33,10 +33,10 @@ typedef struct {
     short int projectileY;
 
     // Enemies
-    int enemyX[8];
-    int enemyY;
+    int enemyX[3][8];
+    int enemyY[3];
     short int enemyDirection;
-    short int enemyCount;
+    short int enemyCount[3];
 
     // Time of run (ms)
     int time;
@@ -55,17 +55,19 @@ typedef struct {
 } TestApp;
 
 void init_game_state(TestApp* app) {
-    app->state.playerX = (DISPLAY_WIDTH - icon_get_width(app->playerIcon)) / 2;
+    app->state.playerX = (DISPLAY_WIDTH - 13) / 2;
     app->state.playerDirection = 0;
     app->state.time = 0;
     app->state.shoot = false;
     app->state.enemyDirection = 1;
 
-    for(short int i = 0; i < 8; i++) {
-        app->state.enemyX[i] = i * 12;
+    for(short int et = 0; et < 3; et++) {
+        for(short int i = 0; i < 8; i++) {
+            app->state.enemyX[et][i] = i * 12;
+        }
+        app->state.enemyY[et] = et * 12;
+        app->state.enemyCount[et] = 8;
     }
-    app->state.enemyY = 0;
-    app->state.enemyCount = 8;
 }
 
 static void my_draw_callback(Canvas* canvas, void* context) {
@@ -74,9 +76,16 @@ static void my_draw_callback(Canvas* canvas, void* context) {
 
     canvas_draw_bitmap(canvas, app->state.playerX, 56, 13, 8, icon_get_data(app->playerIcon));
 
-    for(short int i = 0; i < app->state.enemyCount; i++) {
-        canvas_draw_bitmap(
-            canvas, app->state.enemyX[i], app->state.enemyY, 8, 8, icon_get_data(app->enemyIcon));
+    for(short int et = 0; et < 3; et++) {
+        for(short int i = 0; i < app->state.enemyCount[et]; i++) {
+            canvas_draw_bitmap(
+                canvas,
+                app->state.enemyX[et][i],
+                app->state.enemyY[et],
+                8,
+                8,
+                icon_get_data(app->enemyIcon));
+        }
     }
 
     if(app->state.shoot) {
@@ -121,7 +130,7 @@ static void timer_callback(void* context) {
 
     // Player movement
     app->state.playerX = app->state.playerX + app->state.playerDirection;
-    if(app->state.playerX > DISPLAY_WIDTH - 13) app->state.playerX = DISPLAY_WIDTH;
+    if(app->state.playerX > DISPLAY_WIDTH - 13) app->state.playerX = DISPLAY_WIDTH - 13;
     if(app->state.playerX < 0) app->state.playerX = 0;
 
     // Projectile movement
@@ -134,39 +143,61 @@ static void timer_callback(void* context) {
 
     // Enemy movement
     if(app->state.time % 3 == 0) {
-        if(app->state.enemyDirection == 1 &&
-           app->state.enemyX[app->state.enemyCount - 1] + 8 >= DISPLAY_WIDTH) {
+        int enemyDirection = app->state.enemyDirection;
+        int maxEnemyX = 0;
+        int minEnemyX = DISPLAY_WIDTH;
+
+        for(short int et = 0; et < 3; et++) {
+            if(app->state.enemyCount[et] > 0) {
+                if(maxEnemyX < app->state.enemyX[et][app->state.enemyCount[et] - 1])
+                    maxEnemyX = app->state.enemyX[et][app->state.enemyCount[et] - 1];
+                if(minEnemyX > app->state.enemyX[et][0]) minEnemyX = app->state.enemyX[et][0];
+            }
+        }
+
+        if(enemyDirection == 1 && maxEnemyX + 8 >= DISPLAY_WIDTH) {
             app->state.enemyDirection = -1;
-            app->state.enemyY++;
-        } else if(app->state.enemyDirection == -1 && app->state.enemyX[0] <= 0) {
+            for(short int et = 0; et < 3; et++) {
+                app->state.enemyY[et]++;
+            }
+        } else if(enemyDirection == -1 && minEnemyX <= 0) {
             app->state.enemyDirection = 1;
-            app->state.enemyY++;
+            for(short int et = 0; et < 3; et++) {
+                app->state.enemyY[et]++;
+            }
         } else {
-            for(short int i = 0; i < app->state.enemyCount; i++) {
-                app->state.enemyX[i] += app->state.enemyDirection;
+            for(short int et = 0; et < 3; et++) {
+                for(short int i = 0; i < app->state.enemyCount[et]; i++) {
+                    app->state.enemyX[et][i] += app->state.enemyDirection;
+                }
             }
         }
     }
 
+    // Test hit
     if(app->state.shoot) {
-        if(app->state.projectileY < app->state.enemyY + 8 &&
-           app->state.projectileY > app->state.enemyY) {
-            for(short int j = 0; j < app->state.enemyCount; j++) {
-                if(app->state.projectileX > app->state.enemyX[j] &&
-                   app->state.projectileX < app->state.enemyX[j] + 8) {
-                    if(app->state.enemyCount == 1) {
-                        // Win
-                        init_game_state(app);
-                        return;
+        for(short int et = 0; et < 3; et++) {
+            if(app->state.projectileY < app->state.enemyY[et] + 8 &&
+               app->state.projectileY > app->state.enemyY[et] - 3) {
+                for(short int j = 0; j < app->state.enemyCount[et]; j++) {
+                    if(app->state.projectileX > app->state.enemyX[et][j] &&
+                       app->state.projectileX < app->state.enemyX[et][j] + 8) {
+                        for(short int k = j; k <= app->state.enemyCount[et] - 1; k++) {
+                            app->state.enemyX[et][k] = app->state.enemyX[et][k + 1];
+                        }
+                        app->state.enemyCount[et]--;
+                        app->state.shoot = false;
+                        break;
                     }
-                    for(short int k = j; k <= app->state.enemyCount - 1; k++) {
-                        app->state.enemyX[k] = app->state.enemyX[k + 1];
-                    }
-                    app->state.enemyCount--;
-                    app->state.shoot = false;
-                    break;
                 }
             }
+            if(!app->state.shoot) break;
+        }
+        if(app->state.enemyCount[0] == 0 && app->state.enemyCount[1] == 0 &&
+           app->state.enemyCount[2] == 0) {
+            // Win
+            init_game_state(app);
+            return;
         }
     }
 
