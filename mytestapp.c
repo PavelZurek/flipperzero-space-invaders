@@ -11,6 +11,9 @@
 
 #define FPS 30
 
+#define MAX_EXPLOSIONS 3
+#define EXPLOSION_DURATION 15 // In frames
+
 typedef enum {
     MyEventTypeKey,
     MyEventTypeDone,
@@ -20,6 +23,12 @@ typedef struct {
     MyEventType type; // The reason for this event.
     InputEvent input; // This data is specific to keypress data.
 } MyEvent;
+
+typedef struct {
+    int x;
+    int y;
+    int time;
+} Explosion;
 
 typedef struct {
     // Player coordinates
@@ -38,6 +47,10 @@ typedef struct {
     short int enemyDirection;
     short int enemyCount[3];
 
+    // Expolosions
+    int explosionCount;
+    Explosion explosion[MAX_EXPLOSIONS];
+
     // Time of run (ms)
     int time;
 } TestAppState;
@@ -50,6 +63,7 @@ typedef struct {
 
     Icon* playerIcon; // Player ship
     Icon* enemyIcon[3]; // Enemy ships
+    Icon* boomIcon; // Explosion
 
     TestAppState state; // Application data
 } TestApp;
@@ -60,6 +74,7 @@ void init_game_state(TestApp* app) {
     app->state.time = 0;
     app->state.shoot = false;
     app->state.enemyDirection = 1;
+    app->state.explosionCount = 0;
 
     for(short int et = 0; et < 3; et++) {
         for(short int i = 0; i < 8; i++) {
@@ -74,6 +89,16 @@ void init_game_state(TestApp* app) {
 static void my_draw_callback(Canvas* canvas, void* context) {
     furi_assert(context);
     TestApp* app = (TestApp*)context;
+
+    for(short int i = 0; i < app->state.explosionCount; i++) {
+        canvas_draw_bitmap(
+            canvas,
+            app->state.explosion[i].x,
+            app->state.explosion[i].y,
+            11,
+            9,
+            icon_get_data(app->boomIcon));
+    }
 
     canvas_draw_bitmap(canvas, app->state.playerX, 56, 13, 8, icon_get_data(app->playerIcon));
 
@@ -176,6 +201,18 @@ static void timer_callback(void* context) {
         }
     }
 
+    // Explosion duration
+    if(app->state.explosionCount < MAX_EXPLOSIONS) {
+        for(short int i = app->state.explosionCount - 1; i >= 0; i--) {
+            if(app->state.time - app->state.explosion[i].time > EXPLOSION_DURATION) {
+                app->state.explosionCount--;
+                for(short int j = i; j < app->state.explosionCount; j++) {
+                    app->state.explosion[j] = app->state.explosion[j + 1];
+                }
+            }
+        }
+    }
+
     // Test hit
     if(app->state.shoot) {
         for(short int et = 0; et < 3; et++) {
@@ -183,7 +220,14 @@ static void timer_callback(void* context) {
                app->state.projectileY > app->state.enemyY[et] - 3) {
                 for(short int j = 0; j < app->state.enemyCount[et]; j++) {
                     if(app->state.projectileX > app->state.enemyX[et][j] &&
-                       app->state.projectileX < app->state.enemyX[et][j] + 8) {
+                       app->state.projectileX <
+                           app->state.enemyX[et][j] + icon_get_width(app->enemyIcon[et])) {
+                        Explosion explosion;
+                        explosion.x = app->state.enemyX[et][j];
+                        explosion.y = app->state.enemyY[et];
+                        explosion.time = app->state.time;
+                        app->state.explosion[app->state.explosionCount] = explosion;
+                        app->state.explosionCount++;
                         for(short int k = j; k <= app->state.enemyCount[et] - 1; k++) {
                             app->state.enemyX[et][k] = app->state.enemyX[et][k + 1];
                         }
@@ -239,6 +283,7 @@ int32_t mytestapp_app(void* p) {
     app->enemyIcon[0] = (Icon*)&I_enemy1;
     app->enemyIcon[1] = (Icon*)&I_enemy2;
     app->enemyIcon[2] = (Icon*)&I_enemy3;
+    app->boomIcon = (Icon*)&I_boom;
 
     init_game_state(app);
 
