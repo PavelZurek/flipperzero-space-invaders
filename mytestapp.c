@@ -24,6 +24,14 @@ typedef struct {
     InputEvent input; // This data is specific to keypress data.
 } MyEvent;
 
+typedef enum {
+    // GameStateStart,
+    GameStatePlay,
+    // GameStatePause,
+    GameStateWin,
+    // GameStateLost,
+} GameState;
+
 typedef struct {
     int x;
     int y;
@@ -31,6 +39,9 @@ typedef struct {
 } Explosion;
 
 typedef struct {
+    // Curent state of the game
+    GameState gameState;
+
     // Player coordinates
     short int playerX;
     // Direction of player movement
@@ -69,6 +80,8 @@ typedef struct {
 } TestApp;
 
 void init_game_state(TestApp* app) {
+    app->state.gameState = GameStatePlay;
+
     app->state.playerX = (DISPLAY_WIDTH - 13) / 2;
     app->state.playerDirection = 0;
     app->state.time = 0;
@@ -102,6 +115,22 @@ static void my_draw_callback(Canvas* canvas, void* context) {
 
     canvas_draw_bitmap(canvas, app->state.playerX, 56, 13, 8, icon_get_data(app->playerIcon));
 
+    if(app->state.shoot) {
+        canvas_draw_line(
+            canvas,
+            app->state.projectileX,
+            app->state.projectileY < 0 ? 0 : app->state.projectileY,
+            app->state.projectileX,
+            app->state.projectileY + 3);
+    }
+
+    // If player won, exit here
+    if(app->state.gameState == GameStateWin) {
+        canvas_set_font(canvas, FontPrimary);
+        canvas_draw_str_aligned(canvas, 64, 32, AlignCenter, AlignCenter, "You win!");
+        return;
+    }
+
     for(short int et = 0; et < 3; et++) {
         for(short int i = 0; i < app->state.enemyCount[et]; i++) {
             canvas_draw_bitmap(
@@ -113,32 +142,34 @@ static void my_draw_callback(Canvas* canvas, void* context) {
                 icon_get_data(app->enemyIcon[et]));
         }
     }
-
-    if(app->state.shoot) {
-        canvas_draw_line(
-            canvas,
-            app->state.projectileX,
-            app->state.projectileY < 0 ? 0 : app->state.projectileY,
-            app->state.projectileX,
-            app->state.projectileY + 3);
-    }
 }
 
 static void my_input_callback(InputEvent* input_event, void* context) {
     furi_assert(context);
     TestApp* app = (TestApp*)context;
 
-    if(input_event->type == InputTypeShort) {
-        if(input_event->key == InputKeyBack) {
-            MyEvent event;
-            event.type = MyEventTypeDone;
-            furi_message_queue_put(app->queue, &event, FuriWaitForever);
-        } else if(input_event->key == InputKeyOk && !app->state.shoot) {
+    // Always exit on back button
+    if(input_event->type == InputTypeShort && input_event->key == InputKeyBack) {
+        MyEvent event;
+        event.type = MyEventTypeDone;
+        furi_message_queue_put(app->queue, &event, FuriWaitForever);
+    }
+
+    if(input_event->type == InputTypeShort && input_event->key == InputKeyOk) {
+        // If player won, restart game on OK
+        if(app->state.gameState == GameStateWin) {
+            init_game_state(app);
+        }
+        // Player shooting
+        else if(!app->state.shoot) {
             app->state.projectileX = app->state.playerX + 6;
             app->state.projectileY = DISPLAY_HEIGHT - 8;
             app->state.shoot = true;
         }
-    } else if(input_event->type == InputTypePress) {
+    }
+
+    // Player movement
+    if(input_event->type == InputTypePress) {
         if(input_event->key == InputKeyLeft)
             app->state.playerDirection = -1;
         else if(input_event->key == InputKeyRight)
@@ -168,7 +199,7 @@ static void timer_callback(void* context) {
     }
 
     // Enemy movement
-    if(app->state.time % 3 == 0) {
+    if(app->state.time % 3 == 0 && app->state.gameState == GameStatePlay) {
         int enemyDirection = app->state.enemyDirection;
         int maxEnemyX = 0;
         int minEnemyX = DISPLAY_WIDTH;
@@ -242,7 +273,7 @@ static void timer_callback(void* context) {
         if(app->state.enemyCount[0] == 0 && app->state.enemyCount[1] == 0 &&
            app->state.enemyCount[2] == 0) {
             // Win
-            init_game_state(app);
+            app->state.gameState = GameStateWin;
             return;
         }
     }
