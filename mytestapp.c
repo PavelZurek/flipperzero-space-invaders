@@ -29,7 +29,7 @@ typedef enum {
     GameStatePlay,
     // GameStatePause,
     GameStateWin,
-    // GameStateLost,
+    GameStateLost,
 } GameState;
 
 typedef struct {
@@ -113,7 +113,12 @@ static void my_draw_callback(Canvas* canvas, void* context) {
             icon_get_data(app->boomIcon));
     }
 
-    canvas_draw_bitmap(canvas, app->state.playerX, 56, 13, 8, icon_get_data(app->playerIcon));
+    if(app->state.gameState == GameStateLost) {
+        canvas_draw_bitmap(
+            canvas, app->state.playerX + 1, 56, 11, 8, icon_get_data(app->boomIcon));
+    } else {
+        canvas_draw_bitmap(canvas, app->state.playerX, 56, 13, 8, icon_get_data(app->playerIcon));
+    }
 
     if(app->state.shoot) {
         canvas_draw_line(
@@ -131,6 +136,7 @@ static void my_draw_callback(Canvas* canvas, void* context) {
         return;
     }
 
+    // Draw enemies
     for(short int et = 0; et < 3; et++) {
         for(short int i = 0; i < app->state.enemyCount[et]; i++) {
             canvas_draw_bitmap(
@@ -141,6 +147,15 @@ static void my_draw_callback(Canvas* canvas, void* context) {
                 icon_get_height(app->enemyIcon[et]),
                 icon_get_data(app->enemyIcon[et]));
         }
+    }
+
+    // If player lost, show message
+    if(app->state.gameState == GameStateLost) {
+        canvas_set_color(canvas, ColorBlack);
+        canvas_draw_box(canvas, 39, 27, 50, 10);
+        canvas_set_color(canvas, ColorWhite);
+        canvas_set_font(canvas, FontPrimary);
+        canvas_draw_str_aligned(canvas, 64, 32, AlignCenter, AlignCenter, "You lose!");
     }
 }
 
@@ -157,7 +172,7 @@ static void my_input_callback(InputEvent* input_event, void* context) {
 
     if(input_event->type == InputTypeShort && input_event->key == InputKeyOk) {
         // If player won, restart game on OK
-        if(app->state.gameState == GameStateWin) {
+        if(app->state.gameState == GameStateWin || app->state.gameState == GameStateLost) {
             init_game_state(app);
         }
         // Player shooting
@@ -185,6 +200,26 @@ static void timer_callback(void* context) {
     furi_assert(context);
     TestApp* app = (TestApp*)context;
 
+    // Increase time
+    app->state.time += 1;
+
+    // Explosion duration
+    if(app->state.explosionCount < MAX_EXPLOSIONS) {
+        for(short int i = app->state.explosionCount - 1; i >= 0; i--) {
+            if(app->state.time - app->state.explosion[i].time > EXPLOSION_DURATION) {
+                app->state.explosionCount--;
+                for(short int j = i; j < app->state.explosionCount; j++) {
+                    app->state.explosion[j] = app->state.explosion[j + 1];
+                }
+            }
+        }
+    }
+
+    // If lost, exit here
+    if(app->state.gameState == GameStateLost) {
+        return;
+    }
+
     // Player movement
     app->state.playerX = app->state.playerX + app->state.playerDirection;
     if(app->state.playerX > DISPLAY_WIDTH - 13) app->state.playerX = DISPLAY_WIDTH - 13;
@@ -203,6 +238,7 @@ static void timer_callback(void* context) {
         int enemyDirection = app->state.enemyDirection;
         int maxEnemyX = 0;
         int minEnemyX = DISPLAY_WIDTH;
+        bool movementY = false;
 
         for(short int et = 0; et < 3; et++) {
             if(app->state.enemyCount[et] > 0) {
@@ -215,14 +251,10 @@ static void timer_callback(void* context) {
 
         if(enemyDirection == 1 && maxEnemyX >= DISPLAY_WIDTH) {
             app->state.enemyDirection = -1;
-            for(short int et = 0; et < 3; et++) {
-                app->state.enemyY[et]++;
-            }
+            movementY = true;
         } else if(enemyDirection == -1 && minEnemyX <= 0) {
             app->state.enemyDirection = 1;
-            for(short int et = 0; et < 3; et++) {
-                app->state.enemyY[et]++;
-            }
+            movementY = true;
         } else {
             for(short int et = 0; et < 3; et++) {
                 for(short int i = 0; i < app->state.enemyCount[et]; i++) {
@@ -230,18 +262,32 @@ static void timer_callback(void* context) {
                 }
             }
         }
-    }
 
-    // Explosion duration
-    if(app->state.explosionCount < MAX_EXPLOSIONS) {
-        for(short int i = app->state.explosionCount - 1; i >= 0; i--) {
-            if(app->state.time - app->state.explosion[i].time > EXPLOSION_DURATION) {
-                app->state.explosionCount--;
-                for(short int j = i; j < app->state.explosionCount; j++) {
-                    app->state.explosion[j] = app->state.explosion[j + 1];
+        for(short int et = 0; et < 3; et++) {
+            if(movementY) {
+                app->state.enemyY[et]++;
+                // If enemy touches ground, game over
+                if(app->state.enemyY[et] > 55) {
+                    app->state.gameState = GameStateLost;
+                }
+            }
+            // If enemy touches player, game over
+            else if(app->state.enemyY[et] > 50) {
+                for(short int i = 0; i < app->state.enemyCount[et]; i++) {
+                    int playerX1 = app->state.playerX;
+                    int playerX2 = app->state.playerX + 13;
+                    if(app->state.enemyX[et][i] >= playerX1 - icon_get_width(app->enemyIcon[et]) &&
+                       app->state.enemyX[et][i] <= playerX2) {
+                        app->state.gameState = GameStateLost;
+                    }
                 }
             }
         }
+    }
+
+    // If lost, exit here
+    if(app->state.gameState == GameStateLost) {
+        return;
     }
 
     // Test hit
@@ -277,8 +323,6 @@ static void timer_callback(void* context) {
             return;
         }
     }
-
-    app->state.time += 1;
 }
 
 int32_t mytestapp_app(void* p) {
