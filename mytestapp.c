@@ -49,7 +49,7 @@ typedef struct {
     Gui* gui; // Fullscreen view
 
     Icon* playerIcon; // Player ship
-    Icon* enemyIcon; // Enemy ship
+    Icon* enemyIcon[3]; // Enemy ships
 
     TestAppState state; // Application data
 } TestApp;
@@ -63,7 +63,8 @@ void init_game_state(TestApp* app) {
 
     for(short int et = 0; et < 3; et++) {
         for(short int i = 0; i < 8; i++) {
-            app->state.enemyX[et][i] = i * 12;
+            app->state.enemyX[et][i] = i * 15;
+            if(et == 0) app->state.enemyX[et][i] += 2;
         }
         app->state.enemyY[et] = et * 12;
         app->state.enemyCount[et] = 8;
@@ -82,9 +83,9 @@ static void my_draw_callback(Canvas* canvas, void* context) {
                 canvas,
                 app->state.enemyX[et][i],
                 app->state.enemyY[et],
-                8,
-                8,
-                icon_get_data(app->enemyIcon));
+                icon_get_width(app->enemyIcon[et]),
+                icon_get_height(app->enemyIcon[et]),
+                icon_get_data(app->enemyIcon[et]));
         }
     }
 
@@ -149,13 +150,14 @@ static void timer_callback(void* context) {
 
         for(short int et = 0; et < 3; et++) {
             if(app->state.enemyCount[et] > 0) {
-                if(maxEnemyX < app->state.enemyX[et][app->state.enemyCount[et] - 1])
-                    maxEnemyX = app->state.enemyX[et][app->state.enemyCount[et] - 1];
+                int newMaxX = app->state.enemyX[et][app->state.enemyCount[et] - 1] +
+                              icon_get_width(app->enemyIcon[et]);
+                if(maxEnemyX < newMaxX) maxEnemyX = newMaxX;
                 if(minEnemyX > app->state.enemyX[et][0]) minEnemyX = app->state.enemyX[et][0];
             }
         }
 
-        if(enemyDirection == 1 && maxEnemyX + 8 >= DISPLAY_WIDTH) {
+        if(enemyDirection == 1 && maxEnemyX >= DISPLAY_WIDTH) {
             app->state.enemyDirection = -1;
             for(short int et = 0; et < 3; et++) {
                 app->state.enemyY[et]++;
@@ -234,7 +236,9 @@ int32_t mytestapp_app(void* p) {
     // ---------------
 
     app->playerIcon = (Icon*)&I_player;
-    app->enemyIcon = (Icon*)&I_enemy;
+    app->enemyIcon[0] = (Icon*)&I_enemy1;
+    app->enemyIcon[1] = (Icon*)&I_enemy2;
+    app->enemyIcon[2] = (Icon*)&I_enemy3;
 
     init_game_state(app);
 
