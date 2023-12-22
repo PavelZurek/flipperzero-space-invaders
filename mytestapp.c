@@ -103,6 +103,8 @@ static void my_draw_callback(Canvas* canvas, void* context) {
     furi_assert(context);
     TestApp* app = (TestApp*)context;
 
+    canvas_set_bitmap_mode(canvas, true);
+
     for(short int i = 0; i < app->state.explosionCount; i++) {
         canvas_draw_bitmap(
             canvas,
