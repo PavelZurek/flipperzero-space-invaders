@@ -1,6 +1,16 @@
-Hello World app for Flipper Zero.
+Space Invaders adaptaion for Flipper Zero.
 
-Uses inputs, timer and draw callbacks and some canvas functions.
-Locks backlight on when running.
+Use `ufbt` to build and `ufbt launch` to deploy.
 
-Use `ufbt` tp build and `ufbt launch` to deploy.
+TODO:
+
+ - [x] Multiple enemy types
+ - [x] Enemy exploding
+ - [x] Win/Lose state
+ - [ ] Enemy speeding up, adjust starting speed  
+ - [ ] Enemy shooting
+ - [ ] Pause
+ - [ ] Start state
+ - [ ] Score
+ - [ ] Sound
+
