@@ -49,7 +49,7 @@ typedef struct {
 
     //Playre score
     short int score;
-    char str_score[5];
+    FuriString* score_string;
 
     // Projectile
     bool shoot;
@@ -89,6 +89,7 @@ void init_game_state(TestApp* app) {
     app->state.playerX = (DISPLAY_WIDTH - 13) / 2;
     app->state.playerDirection = 0;
     app->state.score = 0;
+    app->state.score_string = furi_string_alloc_set_str("0");
     app->state.time = 0;
     app->state.shoot = false;
     app->state.enemyDirection = 1;
@@ -141,7 +142,8 @@ static void my_draw_callback(Canvas* canvas, void* context) {
         canvas_set_font(canvas, FontPrimary);
         canvas_draw_str_aligned(canvas, 64, 31, AlignCenter, AlignBottom, "You win!");
         canvas_set_font(canvas, FontSecondary);
-        canvas_draw_str_aligned(canvas, 64, 33, AlignCenter, AlignTop, app->state.str_score);
+        canvas_draw_str_aligned(
+            canvas, 64, 33, AlignCenter, AlignTop, furi_string_get_cstr(app->state.score_string));
         return;
     }
 
@@ -166,12 +168,14 @@ static void my_draw_callback(Canvas* canvas, void* context) {
         canvas_set_font(canvas, FontPrimary);
         canvas_draw_str_aligned(canvas, 64, 31, AlignCenter, AlignBottom, "You lose!");
         canvas_set_font(canvas, FontSecondary);
-        canvas_draw_str_aligned(canvas, 64, 33, AlignCenter, AlignTop, app->state.str_score);
+        canvas_draw_str_aligned(
+            canvas, 64, 33, AlignCenter, AlignTop, furi_string_get_cstr(app->state.score_string));
         return;
     }
 
     canvas_set_font(canvas, FontSecondary);
-    canvas_draw_str_aligned(canvas, 128, 64, AlignRight, AlignBottom, app->state.str_score);
+    canvas_draw_str_aligned(
+        canvas, 128, 64, AlignRight, AlignBottom, furi_string_get_cstr(app->state.score_string));
 }
 
 static void my_input_callback(InputEvent* input_event, void* context) {
@@ -326,7 +330,7 @@ static void timer_callback(void* context) {
                         app->state.enemyCount[et]--;
                         app->state.shoot = false;
                         app->state.score += et == 0 ? 50 : et == 1 ? 20 : 10;
-                        itoa(app->state.score, app->state.str_score, 10);
+                        furi_string_printf(app->state.score_string, "%i", app->state.score);
                         break;
                     }
                 }
@@ -367,6 +371,8 @@ int32_t mytestapp_app(void* p) {
     app->timer = furi_timer_alloc(timer_callback, FuriTimerTypePeriodic, app);
     furi_timer_start(app->timer, 1000 / FPS);
 
+    app->state.score_string = furi_string_alloc();
+
     // ---------------
     //      Setup
     // ---------------
@@ -398,6 +404,7 @@ int32_t mytestapp_app(void* p) {
     // ---------------
 
     // Free resources
+    furi_string_free(app->state.score_string);
     furi_timer_free(app->timer);
     furi_message_queue_free(app->queue);
     view_port_enabled_set(app->view_port, false);
