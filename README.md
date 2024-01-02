@@ -8,9 +8,8 @@ TODO:
  - [x] Enemy exploding
  - [x] Win/Lose state
  - [x] Score
+ - [x] Pause
  - [ ] Enemy speeding up, adjust starting speed  
  - [ ] Enemy shooting
- - [ ] Pause
  - [ ] Start state
  - [ ] Sound
-
