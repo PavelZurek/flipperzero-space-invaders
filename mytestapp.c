@@ -139,9 +139,9 @@ static void my_draw_callback(Canvas* canvas, void* context) {
     // If player won, exit here
     if(app->state.gameState == GameStateWin) {
         canvas_set_font(canvas, FontPrimary);
-        canvas_draw_str_aligned(canvas, 64, 26, AlignCenter, AlignCenter, "You win!");
+        canvas_draw_str_aligned(canvas, 64, 31, AlignCenter, AlignBottom, "You win!");
         canvas_set_font(canvas, FontSecondary);
-        canvas_draw_str_aligned(canvas, 64, 36, AlignCenter, AlignCenter, app->state.str_score);
+        canvas_draw_str_aligned(canvas, 64, 33, AlignCenter, AlignTop, app->state.str_score);
         return;
     }
 
@@ -161,12 +161,12 @@ static void my_draw_callback(Canvas* canvas, void* context) {
     // If player lost, show message
     if(app->state.gameState == GameStateLost) {
         canvas_set_color(canvas, ColorBlack);
-        canvas_draw_box(canvas, 39, 27, 50, 10);
+        canvas_draw_box(canvas, 39, 22, 50, 20);
         canvas_set_color(canvas, ColorWhite);
         canvas_set_font(canvas, FontPrimary);
-        canvas_draw_str_aligned(canvas, 64, 28, AlignCenter, AlignCenter, "You lose!");
+        canvas_draw_str_aligned(canvas, 64, 31, AlignCenter, AlignBottom, "You lose!");
         canvas_set_font(canvas, FontSecondary);
-        canvas_draw_str_aligned(canvas, 64, 36, AlignCenter, AlignCenter, app->state.str_score);
+        canvas_draw_str_aligned(canvas, 64, 33, AlignCenter, AlignTop, app->state.str_score);
         return;
     }
 
