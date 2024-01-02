@@ -33,8 +33,8 @@ typedef enum {
 } GameState;
 
 typedef struct {
-    int x;
-    int y;
+    short int x;
+    short int y;
     int time;
 } Explosion;
 
@@ -57,13 +57,13 @@ typedef struct {
     short int projectileY;
 
     // Enemies
-    int enemyX[3][8];
-    int enemyY[3];
+    short int enemyX[3][8];
+    short int enemyY[3];
     short int enemyDirection;
     short int enemyCount[3];
 
     // Expolosions
-    int explosionCount;
+    short int explosionCount;
     Explosion explosion[MAX_EXPLOSIONS];
 
     // Time of run (ms)
