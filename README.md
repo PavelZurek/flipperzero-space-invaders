@@ -7,10 +7,10 @@ TODO:
  - [x] Multiple enemy types
  - [x] Enemy exploding
  - [x] Win/Lose state
+ - [x] Score
  - [ ] Enemy speeding up, adjust starting speed  
  - [ ] Enemy shooting
  - [ ] Pause
  - [ ] Start state
- - [ ] Score
  - [ ] Sound
 

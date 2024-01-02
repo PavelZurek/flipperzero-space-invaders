@@ -47,6 +47,10 @@ typedef struct {
     // Direction of player movement
     short int playerDirection;
 
+    //Playre score
+    short int score;
+    char str_score[5];
+
     // Projectile
     bool shoot;
     short int projectileX;
@@ -84,6 +88,7 @@ void init_game_state(TestApp* app) {
 
     app->state.playerX = (DISPLAY_WIDTH - 13) / 2;
     app->state.playerDirection = 0;
+    app->state.score = 0;
     app->state.time = 0;
     app->state.shoot = false;
     app->state.enemyDirection = 1;
@@ -134,7 +139,9 @@ static void my_draw_callback(Canvas* canvas, void* context) {
     // If player won, exit here
     if(app->state.gameState == GameStateWin) {
         canvas_set_font(canvas, FontPrimary);
-        canvas_draw_str_aligned(canvas, 64, 32, AlignCenter, AlignCenter, "You win!");
+        canvas_draw_str_aligned(canvas, 64, 26, AlignCenter, AlignCenter, "You win!");
+        canvas_set_font(canvas, FontSecondary);
+        canvas_draw_str_aligned(canvas, 64, 36, AlignCenter, AlignCenter, app->state.str_score);
         return;
     }
 
@@ -157,8 +164,14 @@ static void my_draw_callback(Canvas* canvas, void* context) {
         canvas_draw_box(canvas, 39, 27, 50, 10);
         canvas_set_color(canvas, ColorWhite);
         canvas_set_font(canvas, FontPrimary);
-        canvas_draw_str_aligned(canvas, 64, 32, AlignCenter, AlignCenter, "You lose!");
+        canvas_draw_str_aligned(canvas, 64, 28, AlignCenter, AlignCenter, "You lose!");
+        canvas_set_font(canvas, FontSecondary);
+        canvas_draw_str_aligned(canvas, 64, 36, AlignCenter, AlignCenter, app->state.str_score);
+        return;
     }
+
+    canvas_set_font(canvas, FontSecondary);
+    canvas_draw_str_aligned(canvas, 128, 64, AlignRight, AlignBottom, app->state.str_score);
 }
 
 static void my_input_callback(InputEvent* input_event, void* context) {
@@ -312,6 +325,8 @@ static void timer_callback(void* context) {
                         }
                         app->state.enemyCount[et]--;
                         app->state.shoot = false;
+                        app->state.score += et == 0 ? 50 : et == 1 ? 20 : 10;
+                        itoa(app->state.score, app->state.str_score, 10);
                         break;
                     }
                 }
