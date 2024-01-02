@@ -27,7 +27,7 @@ typedef struct {
 typedef enum {
     // GameStateStart,
     GameStatePlay,
-    // GameStatePause,
+    GameStatePause,
     GameStateWin,
     GameStateLost,
 } GameState;
@@ -128,6 +128,8 @@ static void my_draw_callback(Canvas* canvas, void* context) {
         canvas_draw_bitmap(canvas, app->state.playerX, 56, 13, 8, icon_get_data(app->playerIcon));
     }
 
+    canvas_set_color(canvas, ColorBlack);
+
     if(app->state.shoot) {
         canvas_draw_line(
             canvas,
@@ -173,6 +175,15 @@ static void my_draw_callback(Canvas* canvas, void* context) {
         return;
     }
 
+    if(app->state.gameState == GameStatePause) {
+        canvas_set_color(canvas, ColorBlack);
+        canvas_draw_box(canvas, 44, 25, 40, 12);
+        canvas_set_color(canvas, ColorWhite);
+        canvas_set_font(canvas, FontPrimary);
+        canvas_draw_str_aligned(canvas, 64, 31, AlignCenter, AlignCenter, "Pause");
+    }
+
+    canvas_set_color(canvas, ColorXOR);
     canvas_set_font(canvas, FontSecondary);
     canvas_draw_str_aligned(
         canvas, 128, 64, AlignRight, AlignBottom, furi_string_get_cstr(app->state.score_string));
@@ -182,11 +193,19 @@ static void my_input_callback(InputEvent* input_event, void* context) {
     furi_assert(context);
     TestApp* app = (TestApp*)context;
 
-    // Always exit on back button
-    if(input_event->type == InputTypeShort && input_event->key == InputKeyBack) {
-        MyEvent event;
-        event.type = MyEventTypeDone;
-        furi_message_queue_put(app->queue, &event, FuriWaitForever);
+    // Pause or exit on back button
+    if(input_event->key == InputKeyBack) {
+        if(input_event->type == InputTypeLong) {
+            MyEvent event;
+            event.type = MyEventTypeDone;
+            furi_message_queue_put(app->queue, &event, FuriWaitForever);
+        } else if(input_event->type == InputTypeShort) {
+            if(app->state.gameState == GameStatePlay) {
+                app->state.gameState = GameStatePause;
+            } else if(app->state.gameState == GameStatePause) {
+                app->state.gameState = GameStatePlay;
+            }
+        }
     }
 
     if(input_event->type == InputTypeShort && input_event->key == InputKeyOk) {
@@ -195,7 +214,7 @@ static void my_input_callback(InputEvent* input_event, void* context) {
             init_game_state(app);
         }
         // Player shooting
-        else if(!app->state.shoot) {
+        else if(!app->state.shoot && app->state.gameState == GameStatePlay) {
             app->state.projectileX = app->state.playerX + 6;
             app->state.projectileY = DISPLAY_HEIGHT - 8;
             app->state.shoot = true;
@@ -203,7 +222,7 @@ static void my_input_callback(InputEvent* input_event, void* context) {
     }
 
     // Player movement
-    if(input_event->type == InputTypePress) {
+    if(input_event->type == InputTypePress && app->state.gameState != GameStatePause) {
         if(input_event->key == InputKeyLeft)
             app->state.playerDirection = -1;
         else if(input_event->key == InputKeyRight)
@@ -218,6 +237,11 @@ static void my_input_callback(InputEvent* input_event, void* context) {
 static void timer_callback(void* context) {
     furi_assert(context);
     TestApp* app = (TestApp*)context;
+
+    // Do nothing if game is paused
+    if(app->state.gameState == GameStatePause) {
+        return;
+    }
 
     // Increase time
     app->state.time += 1;
