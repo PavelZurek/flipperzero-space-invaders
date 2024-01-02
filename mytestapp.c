@@ -25,7 +25,7 @@ typedef struct {
 } MyEvent;
 
 typedef enum {
-    // GameStateStart,
+    GameStateStart,
     GameStatePlay,
     GameStatePause,
     GameStateWin,
@@ -176,11 +176,23 @@ static void my_draw_callback(Canvas* canvas, void* context) {
     }
 
     if(app->state.gameState == GameStatePause) {
-        canvas_set_color(canvas, ColorBlack);
-        canvas_draw_box(canvas, 44, 25, 40, 12);
+        canvas_draw_box(canvas, 25, 22, 78, 20);
         canvas_set_color(canvas, ColorWhite);
         canvas_set_font(canvas, FontPrimary);
-        canvas_draw_str_aligned(canvas, 64, 31, AlignCenter, AlignCenter, "Pause");
+        canvas_draw_str_aligned(canvas, 64, 31, AlignCenter, AlignBottom, "Pause");
+        canvas_set_font(canvas, FontSecondary);
+        canvas_draw_str_aligned(canvas, 64, 33, AlignCenter, AlignTop, "Hold BACK to exit");
+    }
+
+    if(app->state.gameState == GameStateStart) {
+        canvas_set_color(canvas, ColorBlack);
+        canvas_draw_box(canvas, 25, 22, 78, 20);
+        canvas_set_color(canvas, ColorWhite);
+        canvas_set_font(canvas, FontPrimary);
+        canvas_draw_str_aligned(canvas, 64, 31, AlignCenter, AlignBottom, "Space Invaders");
+        canvas_set_font(canvas, FontSecondary);
+        canvas_draw_str_aligned(canvas, 64, 33, AlignCenter, AlignTop, "Press OK to play");
+        return;
     }
 
     canvas_set_color(canvas, ColorXOR);
@@ -210,7 +222,8 @@ static void my_input_callback(InputEvent* input_event, void* context) {
 
     if(input_event->type == InputTypeShort && input_event->key == InputKeyOk) {
         // If player won, restart game on OK
-        if(app->state.gameState == GameStateWin || app->state.gameState == GameStateLost) {
+        if(app->state.gameState == GameStateWin || app->state.gameState == GameStateLost ||
+           app->state.gameState == GameStateStart) {
             init_game_state(app);
         }
         // Player shooting
@@ -222,7 +235,8 @@ static void my_input_callback(InputEvent* input_event, void* context) {
     }
 
     // Player movement
-    if(input_event->type == InputTypePress && app->state.gameState != GameStatePause) {
+    if(input_event->type == InputTypePress &&
+       (app->state.gameState == GameStatePlay || app->state.gameState == GameStateWin)) {
         if(input_event->key == InputKeyLeft)
             app->state.playerDirection = -1;
         else if(input_event->key == InputKeyRight)
@@ -239,7 +253,7 @@ static void timer_callback(void* context) {
     TestApp* app = (TestApp*)context;
 
     // Do nothing if game is paused
-    if(app->state.gameState == GameStatePause) {
+    if(app->state.gameState == GameStatePause || app->state.gameState == GameStateStart) {
         return;
     }
 
@@ -408,6 +422,7 @@ int32_t mytestapp_app(void* p) {
     app->boomIcon = (Icon*)&I_boom;
 
     init_game_state(app);
+    app->state.gameState = GameStateStart;
 
     // ---------------
     //    Main loop

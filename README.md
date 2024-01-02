@@ -9,7 +9,7 @@ TODO:
  - [x] Win/Lose state
  - [x] Score
  - [x] Pause
+ - [x] Start state
  - [ ] Enemy speeding up, adjust starting speed  
  - [ ] Enemy shooting
- - [ ] Start state
  - [ ] Sound
