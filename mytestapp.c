@@ -15,14 +15,12 @@
 #define EXPLOSION_DURATION 15 // In frames
 
 typedef enum {
-    MyEventTypeKey,
-    MyEventTypeDone,
-} MyEventType;
+    AppEventTypeDone,
+} AppEventType;
 
 typedef struct {
-    MyEventType type; // The reason for this event.
-    InputEvent input; // This data is specific to keypress data.
-} MyEvent;
+    AppEventType type;
+} AppEvent;
 
 typedef enum {
     GameStateStart,
@@ -68,7 +66,7 @@ typedef struct {
 
     // Time of run (ms)
     int time;
-} TestAppState;
+} GameContext;
 
 typedef struct {
     FuriMessageQueue* queue; // Event queue
@@ -80,82 +78,88 @@ typedef struct {
     Icon* enemyIcon[3]; // Enemy ships
     Icon* boomIcon; // Explosion
 
-    TestAppState state; // Application data
-} TestApp;
+    GameContext gameContext; // Application data
+} AppContext;
 
-void init_game_state(TestApp* app) {
-    app->state.gameState = GameStatePlay;
+void init_game_state(AppContext* app) {
+    app->gameContext.gameState = GameStatePlay;
 
-    app->state.playerX = (DISPLAY_WIDTH - 13) / 2;
-    app->state.playerDirection = 0;
-    app->state.score = 0;
-    app->state.score_string = furi_string_alloc_set_str("0");
-    app->state.time = 0;
-    app->state.shoot = false;
-    app->state.enemyDirection = 1;
-    app->state.explosionCount = 0;
+    app->gameContext.playerX = (DISPLAY_WIDTH - 13) / 2;
+    app->gameContext.playerDirection = 0;
+    app->gameContext.score = 0;
+    app->gameContext.score_string = furi_string_alloc_set_str("0");
+    app->gameContext.time = 0;
+    app->gameContext.shoot = false;
+    app->gameContext.enemyDirection = 1;
+    app->gameContext.explosionCount = 0;
 
     for(short int et = 0; et < 3; et++) {
         for(short int i = 0; i < 8; i++) {
-            app->state.enemyX[et][i] = i * 15;
-            if(et == 0) app->state.enemyX[et][i] += 2;
+            app->gameContext.enemyX[et][i] = i * 15;
+            if(et == 0) app->gameContext.enemyX[et][i] += 2;
         }
-        app->state.enemyY[et] = et * 12;
-        app->state.enemyCount[et] = 8;
+        app->gameContext.enemyY[et] = et * 12;
+        app->gameContext.enemyCount[et] = 8;
     }
 }
 
 static void my_draw_callback(Canvas* canvas, void* context) {
     furi_assert(context);
-    TestApp* app = (TestApp*)context;
+    AppContext* app = (AppContext*)context;
 
     canvas_set_bitmap_mode(canvas, true);
 
-    for(short int i = 0; i < app->state.explosionCount; i++) {
+    for(short int i = 0; i < app->gameContext.explosionCount; i++) {
         canvas_draw_bitmap(
             canvas,
-            app->state.explosion[i].x,
-            app->state.explosion[i].y,
+            app->gameContext.explosion[i].x,
+            app->gameContext.explosion[i].y,
             11,
             9,
             icon_get_data(app->boomIcon));
     }
 
-    if(app->state.gameState == GameStateLost) {
+    if(app->gameContext.gameState == GameStateLost) {
         canvas_draw_bitmap(
-            canvas, app->state.playerX + 1, 56, 11, 8, icon_get_data(app->boomIcon));
+            canvas, app->gameContext.playerX + 1, 56, 11, 8, icon_get_data(app->boomIcon));
     } else {
-        canvas_draw_bitmap(canvas, app->state.playerX, 56, 13, 8, icon_get_data(app->playerIcon));
+        canvas_draw_bitmap(
+            canvas, app->gameContext.playerX, 56, 13, 8, icon_get_data(app->playerIcon));
     }
 
     canvas_set_color(canvas, ColorBlack);
 
-    if(app->state.shoot) {
+    if(app->gameContext.shoot) {
         canvas_draw_line(
             canvas,
-            app->state.projectileX,
-            app->state.projectileY < 0 ? 0 : app->state.projectileY,
-            app->state.projectileX,
-            app->state.projectileY + 3);
+            app->gameContext.projectileX,
+            app->gameContext.projectileY < 0 ? 0 : app->gameContext.projectileY,
+            app->gameContext.projectileX,
+            app->gameContext.projectileY + 3);
     }
 
     // If player won, exit here
-    if(app->state.gameState == GameStateWin) {
+    if(app->gameContext.gameState == GameStateWin) {
         canvas_set_font(canvas, FontPrimary);
         canvas_draw_str_aligned(canvas, 64, 31, AlignCenter, AlignBottom, "You win!");
         canvas_set_font(canvas, FontSecondary);
         canvas_draw_str_aligned(
-            canvas, 64, 33, AlignCenter, AlignTop, furi_string_get_cstr(app->state.score_string));
+            canvas,
+            64,
+            33,
+            AlignCenter,
+            AlignTop,
+            furi_string_get_cstr(app->gameContext.score_string));
         return;
     }
 
     // Draw enemies
     for(short int et = 0; et < 3; et++) {
-        for(short int i = 0; i < app->state.enemyCount[et]; i++) {
+        for(short int i = 0; i < app->gameContext.enemyCount[et]; i++) {
             canvas_draw_bitmap(
                 canvas,
-                app->state.enemyX[et][i],
-                app->state.enemyY[et],
+                app->gameContext.enemyX[et][i],
+                app->gameContext.enemyY[et],
                 icon_get_width(app->enemyIcon[et]),
                 icon_get_height(app->enemyIcon[et]),
                 icon_get_data(app->enemyIcon[et]));
@@ -163,7 +167,7 @@ static void my_draw_callback(Canvas* canvas, void* context) {
     }
 
     // If player lost, show message
-    if(app->state.gameState == GameStateLost) {
+    if(app->gameContext.gameState == GameStateLost) {
         canvas_set_color(canvas, ColorBlack);
         canvas_draw_box(canvas, 39, 22, 50, 20);
         canvas_set_color(canvas, ColorWhite);
@@ -171,12 +175,17 @@ static void my_draw_callback(Canvas* canvas, void* context) {
         canvas_draw_str_aligned(canvas, 64, 31, AlignCenter, AlignBottom, "You lose!");
         canvas_set_font(canvas, FontSecondary);
         canvas_draw_str_aligned(
-            canvas, 64, 33, AlignCenter, AlignTop, furi_string_get_cstr(app->state.score_string));
+            canvas,
+            64,
+            33,
+            AlignCenter,
+            AlignTop,
+            furi_string_get_cstr(app->gameContext.score_string));
         return;
     }
 
     // Game is paused
-    if(app->state.gameState == GameStatePause) {
+    if(app->gameContext.gameState == GameStatePause) {
         canvas_draw_box(canvas, 25, 22, 78, 20);
         canvas_set_color(canvas, ColorWhite);
         canvas_set_font(canvas, FontPrimary);
@@ -186,7 +195,7 @@ static void my_draw_callback(Canvas* canvas, void* context) {
     }
 
     // App started
-    if(app->state.gameState == GameStateStart) {
+    if(app->gameContext.gameState == GameStateStart) {
         canvas_set_color(canvas, ColorBlack);
         canvas_draw_box(canvas, 25, 22, 78, 20);
         canvas_set_color(canvas, ColorWhite);
@@ -201,148 +210,158 @@ static void my_draw_callback(Canvas* canvas, void* context) {
     canvas_set_color(canvas, ColorXOR);
     canvas_set_font(canvas, FontSecondary);
     canvas_draw_str_aligned(
-        canvas, 128, 64, AlignRight, AlignBottom, furi_string_get_cstr(app->state.score_string));
+        canvas,
+        128,
+        64,
+        AlignRight,
+        AlignBottom,
+        furi_string_get_cstr(app->gameContext.score_string));
 }
 
 static void my_input_callback(InputEvent* input_event, void* context) {
     furi_assert(context);
-    TestApp* app = (TestApp*)context;
+    AppContext* app = (AppContext*)context;
 
     // Pause or exit on back button
     if(input_event->key == InputKeyBack) {
         if(input_event->type == InputTypeLong) {
-            MyEvent event;
-            event.type = MyEventTypeDone;
+            AppEvent event;
+            event.type = AppEventTypeDone;
             furi_message_queue_put(app->queue, &event, FuriWaitForever);
         } else if(input_event->type == InputTypeShort) {
-            if(app->state.gameState == GameStatePlay) {
-                app->state.gameState = GameStatePause;
-            } else if(app->state.gameState == GameStatePause) {
-                app->state.gameState = GameStatePlay;
+            if(app->gameContext.gameState == GameStatePlay) {
+                app->gameContext.gameState = GameStatePause;
+            } else if(app->gameContext.gameState == GameStatePause) {
+                app->gameContext.gameState = GameStatePlay;
             }
         }
     }
 
     if(input_event->type == InputTypeShort && input_event->key == InputKeyOk) {
         // If player won, restart game on OK
-        if(app->state.gameState == GameStateWin || app->state.gameState == GameStateLost ||
-           app->state.gameState == GameStateStart) {
+        if(app->gameContext.gameState == GameStateWin ||
+           app->gameContext.gameState == GameStateLost ||
+           app->gameContext.gameState == GameStateStart) {
             init_game_state(app);
         }
         // Player shooting
-        else if(!app->state.shoot && app->state.gameState == GameStatePlay) {
-            app->state.projectileX = app->state.playerX + 6;
-            app->state.projectileY = DISPLAY_HEIGHT - 8;
-            app->state.shoot = true;
+        else if(!app->gameContext.shoot && app->gameContext.gameState == GameStatePlay) {
+            app->gameContext.projectileX = app->gameContext.playerX + 6;
+            app->gameContext.projectileY = DISPLAY_HEIGHT - 8;
+            app->gameContext.shoot = true;
         }
     }
 
     // Player movement
-    if(input_event->type == InputTypePress &&
-       (app->state.gameState == GameStatePlay || app->state.gameState == GameStateWin)) {
+    if(input_event->type == InputTypePress && (app->gameContext.gameState == GameStatePlay ||
+                                               app->gameContext.gameState == GameStateWin)) {
         if(input_event->key == InputKeyLeft)
-            app->state.playerDirection = -1;
+            app->gameContext.playerDirection = -1;
         else if(input_event->key == InputKeyRight)
-            app->state.playerDirection = 1;
+            app->gameContext.playerDirection = 1;
     } else if(input_event->type == InputTypeRelease) {
         if(input_event->key == InputKeyLeft || input_event->key == InputKeyRight) {
-            app->state.playerDirection = 0;
+            app->gameContext.playerDirection = 0;
         }
     }
 }
 
 static void timer_callback(void* context) {
     furi_assert(context);
-    TestApp* app = (TestApp*)context;
+    AppContext* app = (AppContext*)context;
 
     // Do nothing if game is paused
-    if(app->state.gameState == GameStatePause || app->state.gameState == GameStateStart) {
+    if(app->gameContext.gameState == GameStatePause ||
+       app->gameContext.gameState == GameStateStart) {
         return;
     }
 
     // Increase time
-    app->state.time += 1;
+    app->gameContext.time += 1;
 
     // Explosion duration
-    if(app->state.explosionCount < MAX_EXPLOSIONS) {
-        for(short int i = app->state.explosionCount - 1; i >= 0; i--) {
-            if(app->state.time - app->state.explosion[i].time > EXPLOSION_DURATION) {
-                app->state.explosionCount--;
-                for(short int j = i; j < app->state.explosionCount; j++) {
-                    app->state.explosion[j] = app->state.explosion[j + 1];
+    if(app->gameContext.explosionCount < MAX_EXPLOSIONS) {
+        for(short int i = app->gameContext.explosionCount - 1; i >= 0; i--) {
+            if(app->gameContext.time - app->gameContext.explosion[i].time > EXPLOSION_DURATION) {
+                app->gameContext.explosionCount--;
+                for(short int j = i; j < app->gameContext.explosionCount; j++) {
+                    app->gameContext.explosion[j] = app->gameContext.explosion[j + 1];
                 }
             }
         }
     }
 
     // If lost, exit here
-    if(app->state.gameState == GameStateLost) {
+    if(app->gameContext.gameState == GameStateLost) {
         return;
     }
 
     // Player movement
-    app->state.playerX = app->state.playerX + app->state.playerDirection;
-    if(app->state.playerX > DISPLAY_WIDTH - 13) app->state.playerX = DISPLAY_WIDTH - 13;
-    if(app->state.playerX < 0) app->state.playerX = 0;
+    app->gameContext.playerX = app->gameContext.playerX + app->gameContext.playerDirection;
+    if(app->gameContext.playerX > DISPLAY_WIDTH - 13)
+        app->gameContext.playerX = DISPLAY_WIDTH - 13;
+    if(app->gameContext.playerX < 0) app->gameContext.playerX = 0;
 
     // Projectile movement
-    if(app->state.shoot) {
-        app->state.projectileY--;
-        if(app->state.projectileY < -3) {
-            app->state.shoot = false;
+    if(app->gameContext.shoot) {
+        app->gameContext.projectileY--;
+        if(app->gameContext.projectileY < -3) {
+            app->gameContext.shoot = false;
         }
     }
 
     // Enemy movement
-    if(app->state.time % 3 == 0 && app->state.gameState == GameStatePlay) {
-        int enemyDirection = app->state.enemyDirection;
+    if(app->gameContext.time % 3 == 0 && app->gameContext.gameState == GameStatePlay) {
+        int enemyDirection = app->gameContext.enemyDirection;
         int maxEnemyX = 0;
         int minEnemyX = DISPLAY_WIDTH;
         bool movementY = false;
 
         // Find enemy bounderies
         for(short int et = 0; et < 3; et++) {
-            if(app->state.enemyCount[et] > 0) {
-                int newMaxX = app->state.enemyX[et][app->state.enemyCount[et] - 1] +
+            if(app->gameContext.enemyCount[et] > 0) {
+                int newMaxX = app->gameContext.enemyX[et][app->gameContext.enemyCount[et] - 1] +
                               icon_get_width(app->enemyIcon[et]);
                 if(maxEnemyX < newMaxX) maxEnemyX = newMaxX;
-                if(minEnemyX > app->state.enemyX[et][0]) minEnemyX = app->state.enemyX[et][0];
+                if(minEnemyX > app->gameContext.enemyX[et][0])
+                    minEnemyX = app->gameContext.enemyX[et][0];
             }
         }
 
         // Change direction and ascend
         if(enemyDirection == 1 && maxEnemyX >= DISPLAY_WIDTH) {
-            app->state.enemyDirection = -1;
+            app->gameContext.enemyDirection = -1;
             movementY = true;
         } else if(enemyDirection == -1 && minEnemyX <= 0) {
-            app->state.enemyDirection = 1;
+            app->gameContext.enemyDirection = 1;
             movementY = true;
         }
         // Or move in the direction
         else {
             for(short int et = 0; et < 3; et++) {
-                for(short int i = 0; i < app->state.enemyCount[et]; i++) {
-                    app->state.enemyX[et][i] += app->state.enemyDirection;
+                for(short int i = 0; i < app->gameContext.enemyCount[et]; i++) {
+                    app->gameContext.enemyX[et][i] += app->gameContext.enemyDirection;
                 }
             }
         }
 
         for(short int et = 0; et < 3; et++) {
             if(movementY) {
-                app->state.enemyY[et]++;
+                app->gameContext.enemyY[et]++;
                 // If enemy touches ground, game over
-                if(app->state.enemyY[et] > 55 && app->state.enemyCount[et] > 0) {
-                    app->state.gameState = GameStateLost;
+                if(app->gameContext.enemyY[et] > 55 && app->gameContext.enemyCount[et] > 0) {
+                    app->gameContext.gameState = GameStateLost;
                 }
             }
             // If enemy touches player, game over
-            else if(app->state.enemyY[et] > 50) {
-                for(short int i = 0; i < app->state.enemyCount[et]; i++) {
-                    int playerX1 = app->state.playerX;
-                    int playerX2 = app->state.playerX + 13;
-                    if(app->state.enemyX[et][i] >= playerX1 - icon_get_width(app->enemyIcon[et]) &&
-                       app->state.enemyX[et][i] <= playerX2) {
-                        app->state.gameState = GameStateLost;
+            else if(app->gameContext.enemyY[et] > 50) {
+                for(short int i = 0; i < app->gameContext.enemyCount[et]; i++) {
+                    int playerX1 = app->gameContext.playerX;
+                    int playerX2 = app->gameContext.playerX + 13;
+                    if(app->gameContext.enemyX[et][i] >=
+                           playerX1 - icon_get_width(app->enemyIcon[et]) &&
+                       app->gameContext.enemyX[et][i] <= playerX2) {
+                        app->gameContext.gameState = GameStateLost;
                     }
                 }
             }
@@ -350,42 +369,43 @@ static void timer_callback(void* context) {
     }
 
     // If lost, exit here
-    if(app->state.gameState == GameStateLost) {
+    if(app->gameContext.gameState == GameStateLost) {
         return;
     }
 
     // Test hit
-    if(app->state.shoot) {
+    if(app->gameContext.shoot) {
         for(short int et = 0; et < 3; et++) {
-            if(app->state.projectileY < app->state.enemyY[et] + 8 &&
-               app->state.projectileY > app->state.enemyY[et] - 3) {
-                for(short int j = 0; j < app->state.enemyCount[et]; j++) {
-                    if(app->state.projectileX > app->state.enemyX[et][j] &&
-                       app->state.projectileX <
-                           app->state.enemyX[et][j] + icon_get_width(app->enemyIcon[et])) {
+            if(app->gameContext.projectileY < app->gameContext.enemyY[et] + 8 &&
+               app->gameContext.projectileY > app->gameContext.enemyY[et] - 3) {
+                for(short int j = 0; j < app->gameContext.enemyCount[et]; j++) {
+                    if(app->gameContext.projectileX > app->gameContext.enemyX[et][j] &&
+                       app->gameContext.projectileX <
+                           app->gameContext.enemyX[et][j] + icon_get_width(app->enemyIcon[et])) {
                         Explosion explosion;
-                        explosion.x = app->state.enemyX[et][j];
-                        explosion.y = app->state.enemyY[et];
-                        explosion.time = app->state.time;
-                        app->state.explosion[app->state.explosionCount] = explosion;
-                        app->state.explosionCount++;
-                        for(short int k = j; k <= app->state.enemyCount[et] - 1; k++) {
-                            app->state.enemyX[et][k] = app->state.enemyX[et][k + 1];
+                        explosion.x = app->gameContext.enemyX[et][j];
+                        explosion.y = app->gameContext.enemyY[et];
+                        explosion.time = app->gameContext.time;
+                        app->gameContext.explosion[app->gameContext.explosionCount] = explosion;
+                        app->gameContext.explosionCount++;
+                        for(short int k = j; k <= app->gameContext.enemyCount[et] - 1; k++) {
+                            app->gameContext.enemyX[et][k] = app->gameContext.enemyX[et][k + 1];
                         }
-                        app->state.enemyCount[et]--;
-                        app->state.shoot = false;
-                        app->state.score += et == 0 ? 50 : et == 1 ? 20 : 10;
-                        furi_string_printf(app->state.score_string, "%i", app->state.score);
+                        app->gameContext.enemyCount[et]--;
+                        app->gameContext.shoot = false;
+                        app->gameContext.score += et == 0 ? 50 : et == 1 ? 20 : 10;
+                        furi_string_printf(
+                            app->gameContext.score_string, "%i", app->gameContext.score);
                         break;
                     }
                 }
             }
-            if(!app->state.shoot) break;
+            if(!app->gameContext.shoot) break;
         }
-        if(app->state.enemyCount[0] == 0 && app->state.enemyCount[1] == 0 &&
-           app->state.enemyCount[2] == 0) {
+        if(app->gameContext.enemyCount[0] == 0 && app->gameContext.enemyCount[1] == 0 &&
+           app->gameContext.enemyCount[2] == 0) {
             // Win
-            app->state.gameState = GameStateWin;
+            app->gameContext.gameState = GameStateWin;
             return;
         }
     }
@@ -397,10 +417,10 @@ int32_t mytestapp_app(void* p) {
     // ---------------
     //      Init
     // ---------------
-    TestApp* app = (TestApp*)malloc(sizeof(TestApp));
+    AppContext* app = (AppContext*)malloc(sizeof(AppContext));
 
     // Create event queue
-    app->queue = furi_message_queue_alloc(8, sizeof(MyEvent));
+    app->queue = furi_message_queue_alloc(8, sizeof(AppEvent));
 
     // Create view port
     app->view_port = view_port_alloc();
@@ -416,7 +436,7 @@ int32_t mytestapp_app(void* p) {
     app->timer = furi_timer_alloc(timer_callback, FuriTimerTypePeriodic, app);
     furi_timer_start(app->timer, 1000 / FPS);
 
-    app->state.score_string = furi_string_alloc();
+    app->gameContext.score_string = furi_string_alloc();
 
     // ---------------
     //      Setup
@@ -429,15 +449,15 @@ int32_t mytestapp_app(void* p) {
     app->boomIcon = (Icon*)&I_boom;
 
     init_game_state(app);
-    app->state.gameState = GameStateStart;
+    app->gameContext.gameState = GameStateStart;
 
     // ---------------
     //    Main loop
     // ---------------
-    MyEvent event;
+    AppEvent event;
     while(true) {
         if(furi_message_queue_get(app->queue, &event, FuriWaitForever) == FuriStatusOk) {
-            if(event.type == MyEventTypeDone) {
+            if(event.type == AppEventTypeDone) {
                 break;
             }
         } else {
@@ -450,7 +470,7 @@ int32_t mytestapp_app(void* p) {
     // ---------------
 
     // Free resources
-    furi_string_free(app->state.score_string);
+    furi_string_free(app->gameContext.score_string);
     furi_timer_free(app->timer);
     furi_message_queue_free(app->queue);
     view_port_enabled_set(app->view_port, false);
