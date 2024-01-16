@@ -59,6 +59,7 @@ typedef struct {
     short int enemyY[3];
     short int enemyDirection;
     short int enemyCount[3];
+    bool enemyAnimation;
 
     // Expolosions
     short int explosionCount;
@@ -75,7 +76,7 @@ typedef struct {
     Gui* gui; // Fullscreen view
 
     Icon* playerIcon; // Player ship
-    Icon* enemyIcon[3]; // Enemy ships
+    Icon* enemyIcon[2][3]; // Enemy ships
     Icon* boomIcon; // Explosion
 
     GameContext gameContext; // Application data
@@ -92,6 +93,7 @@ void init_game_state(AppContext* app) {
     app->gameContext.shoot = false;
     app->gameContext.enemyDirection = 1;
     app->gameContext.explosionCount = 0;
+    app->gameContext.enemyAnimation = false;
 
     for(short int et = 0; et < 3; et++) {
         for(short int i = 0; i < 8; i++) {
@@ -160,9 +162,9 @@ static void my_draw_callback(Canvas* canvas, void* context) {
                 canvas,
                 app->gameContext.enemyX[et][i],
                 app->gameContext.enemyY[et],
-                icon_get_width(app->enemyIcon[et]),
-                icon_get_height(app->enemyIcon[et]),
-                icon_get_data(app->enemyIcon[et]));
+                icon_get_width(app->enemyIcon[app->gameContext.enemyAnimation][et]),
+                icon_get_height(app->enemyIcon[app->gameContext.enemyAnimation][et]),
+                icon_get_data(app->enemyIcon[app->gameContext.enemyAnimation][et]));
         }
     }
 
@@ -291,6 +293,10 @@ static void timer_callback(void* context) {
         }
     }
 
+    if(app->gameContext.time % 15 == 1) {
+        app->gameContext.enemyAnimation = !app->gameContext.enemyAnimation;
+    }
+
     // If lost, exit here
     if(app->gameContext.gameState == GameStateLost) {
         return;
@@ -321,7 +327,7 @@ static void timer_callback(void* context) {
         for(short int et = 0; et < 3; et++) {
             if(app->gameContext.enemyCount[et] > 0) {
                 int newMaxX = app->gameContext.enemyX[et][app->gameContext.enemyCount[et] - 1] +
-                              icon_get_width(app->enemyIcon[et]);
+                              icon_get_width(app->enemyIcon[app->gameContext.enemyAnimation][et]);
                 if(maxEnemyX < newMaxX) maxEnemyX = newMaxX;
                 if(minEnemyX > app->gameContext.enemyX[et][0])
                     minEnemyX = app->gameContext.enemyX[et][0];
@@ -359,7 +365,8 @@ static void timer_callback(void* context) {
                     int playerX1 = app->gameContext.playerX;
                     int playerX2 = app->gameContext.playerX + 13;
                     if(app->gameContext.enemyX[et][i] >=
-                           playerX1 - icon_get_width(app->enemyIcon[et]) &&
+                           playerX1 - icon_get_width(
+                                          app->enemyIcon[app->gameContext.enemyAnimation][et]) &&
                        app->gameContext.enemyX[et][i] <= playerX2) {
                         app->gameContext.gameState = GameStateLost;
                     }
@@ -381,7 +388,9 @@ static void timer_callback(void* context) {
                 for(short int j = 0; j < app->gameContext.enemyCount[et]; j++) {
                     if(app->gameContext.projectileX > app->gameContext.enemyX[et][j] &&
                        app->gameContext.projectileX <
-                           app->gameContext.enemyX[et][j] + icon_get_width(app->enemyIcon[et])) {
+                           app->gameContext.enemyX[et][j] +
+                               icon_get_width(
+                                   app->enemyIcon[app->gameContext.enemyAnimation][et])) {
                         Explosion explosion;
                         explosion.x = app->gameContext.enemyX[et][j];
                         explosion.y = app->gameContext.enemyY[et];
@@ -443,9 +452,12 @@ int32_t mytestapp_app(void* p) {
     // ---------------
 
     app->playerIcon = (Icon*)&I_player;
-    app->enemyIcon[0] = (Icon*)&I_enemy1;
-    app->enemyIcon[1] = (Icon*)&I_enemy2;
-    app->enemyIcon[2] = (Icon*)&I_enemy3;
+    app->enemyIcon[0][0] = (Icon*)&I_enemy1a;
+    app->enemyIcon[0][1] = (Icon*)&I_enemy2a;
+    app->enemyIcon[0][2] = (Icon*)&I_enemy3a;
+    app->enemyIcon[1][0] = (Icon*)&I_enemy1b;
+    app->enemyIcon[1][1] = (Icon*)&I_enemy2b;
+    app->enemyIcon[1][2] = (Icon*)&I_enemy3b;
     app->boomIcon = (Icon*)&I_boom;
 
     init_game_state(app);
