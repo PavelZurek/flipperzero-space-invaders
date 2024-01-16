@@ -175,6 +175,7 @@ static void my_draw_callback(Canvas* canvas, void* context) {
         return;
     }
 
+    // Game is paused
     if(app->state.gameState == GameStatePause) {
         canvas_draw_box(canvas, 25, 22, 78, 20);
         canvas_set_color(canvas, ColorWhite);
@@ -184,6 +185,7 @@ static void my_draw_callback(Canvas* canvas, void* context) {
         canvas_draw_str_aligned(canvas, 64, 33, AlignCenter, AlignTop, "Hold BACK to exit");
     }
 
+    // App started
     if(app->state.gameState == GameStateStart) {
         canvas_set_color(canvas, ColorBlack);
         canvas_draw_box(canvas, 25, 22, 78, 20);
@@ -195,6 +197,7 @@ static void my_draw_callback(Canvas* canvas, void* context) {
         return;
     }
 
+    // Draw score
     canvas_set_color(canvas, ColorXOR);
     canvas_set_font(canvas, FontSecondary);
     canvas_draw_str_aligned(
@@ -297,6 +300,7 @@ static void timer_callback(void* context) {
         int minEnemyX = DISPLAY_WIDTH;
         bool movementY = false;
 
+        // Find enemy bounderies
         for(short int et = 0; et < 3; et++) {
             if(app->state.enemyCount[et] > 0) {
                 int newMaxX = app->state.enemyX[et][app->state.enemyCount[et] - 1] +
@@ -306,13 +310,16 @@ static void timer_callback(void* context) {
             }
         }
 
+        // Change direction and ascend
         if(enemyDirection == 1 && maxEnemyX >= DISPLAY_WIDTH) {
             app->state.enemyDirection = -1;
             movementY = true;
         } else if(enemyDirection == -1 && minEnemyX <= 0) {
             app->state.enemyDirection = 1;
             movementY = true;
-        } else {
+        }
+        // Or move in the direction
+        else {
             for(short int et = 0; et < 3; et++) {
                 for(short int i = 0; i < app->state.enemyCount[et]; i++) {
                     app->state.enemyX[et][i] += app->state.enemyDirection;
