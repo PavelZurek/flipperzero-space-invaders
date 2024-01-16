@@ -324,7 +324,7 @@ static void timer_callback(void* context) {
             if(movementY) {
                 app->state.enemyY[et]++;
                 // If enemy touches ground, game over
-                if(app->state.enemyY[et] > 55) {
+                if(app->state.enemyY[et] > 55 && app->state.enemyCount[et] > 0) {
                     app->state.gameState = GameStateLost;
                 }
             }
