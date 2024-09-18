@@ -118,15 +118,15 @@ static void my_draw_callback(Canvas* canvas, void* context) {
             app->gameContext.explosion[i].y,
             11,
             9,
-            icon_get_data(app->boomIcon));
+            icon_get_frame_data(app->boomIcon, 0));
     }
 
     if(app->gameContext.gameState == GameStateLost) {
         canvas_draw_bitmap(
-            canvas, app->gameContext.playerX + 1, 56, 11, 8, icon_get_data(app->boomIcon));
+            canvas, app->gameContext.playerX + 1, 56, 11, 8, icon_get_frame_data(app->boomIcon, 0));
     } else {
         canvas_draw_bitmap(
-            canvas, app->gameContext.playerX, 56, 13, 8, icon_get_data(app->playerIcon));
+            canvas, app->gameContext.playerX, 56, 13, 8, icon_get_frame_data(app->playerIcon, 0));
     }
 
     canvas_set_color(canvas, ColorBlack);
@@ -164,7 +164,7 @@ static void my_draw_callback(Canvas* canvas, void* context) {
                 app->gameContext.enemyY[et],
                 icon_get_width(app->enemyIcon[app->gameContext.enemyAnimation][et]),
                 icon_get_height(app->enemyIcon[app->gameContext.enemyAnimation][et]),
-                icon_get_data(app->enemyIcon[app->gameContext.enemyAnimation][et]));
+                icon_get_frame_data(app->enemyIcon[app->gameContext.enemyAnimation][et], 0));
         }
     }
 
