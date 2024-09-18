@@ -1,6 +1,6 @@
 Space Invaders adaptaion for Flipper Zero.
 
-Use `ufbt` to build and `ufbt launch` to deploy.
+Check github actions to download or build your own with `ufbt`.
 
 TODO:
 
